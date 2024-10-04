@@ -1,5 +1,15 @@
 #include "pch.h"
-#include "helpers.hpp"
+
+enum ARG_FLAGS
+{
+	INVALID_ARGUMENT  = 0x00,
+	DEFAULT           = 0x01,
+	ALIGN_EQUAL_SIGN  = 0x02,
+	ALIGN_VALUES      = 0x04,
+	HEX_OUTPUT        = 0x08,
+	IDA_ENUM_TO_CPP   = 0x10,
+	CPP_STRUCT_TO_IDA = 0x20
+};
 
 void PrintAlignedData(int flags, std::vector<std::string>& data)
 {
@@ -103,7 +113,7 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 	std::cout << line;
 
 	const bool decimal = (flags & HEX_OUTPUT) == 0;
-	std::vector<std::string> enums;
+	std::vector<std::string> lines;
 
 	while (std::getline(file, line))
 	{
@@ -125,10 +135,10 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 			line += std::to_string(std::stoul(line.substr(NumStart, line.size() - NumStart), nullptr, 16));
 		}
 
-		enums.emplace_back(line);
+		lines.emplace_back(line);
 	}
 
-	PrintAlignedData(flags, enums);
+	PrintAlignedData(flags, lines);
 }
 
 int GetFlags(int argc, wchar_t* argv[])
@@ -149,12 +159,6 @@ int GetFlags(int argc, wchar_t* argv[])
 
 		else if (_wcsicmp(arg, L"hex") == 0)
 			flags |= HEX_OUTPUT;
-
-		else if (_wcsicmp(arg, L"A32") == 0)
-			flags |= ALIGN_NUM_32_BIT;
-
-		else if (_wcsicmp(arg, L"A64") == 0)
-			flags |= ALIGN_NUM_64_BIT;
 
 		else return INVALID_ARGUMENT;
 	}
@@ -205,9 +209,9 @@ int wmain(int argc, wchar_t* argv[])
 	{
 		CvtCppStruct(flags, file);
 	}
-	else // Apply alignment without conversion
+	else
 	{
-		
+		// Will write a function that deals with alignment only later
 	}
 
 	file.close();
