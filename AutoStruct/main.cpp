@@ -30,14 +30,22 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 		line.erase(0, start);
 		line = "   " + line;
 
+		const bool IsHex = line.back() == 'h';
+		if (IsHex) line.pop_back();
+
+		const int NumStart = line.find_last_of(' ') + 1;
+
 		if (!decimal)
 		{
-			if (line.back() == 'h')
-				line.pop_back();
-			
 			const int NumStart = line.find_last_of(' ') + 1;
 			line.insert(line.begin() + NumStart, '0');
 			line.insert(line.begin() + NumStart + 1, 'x');
+		}
+		else if (IsHex)
+		{
+			const unsigned long dec = std::stoul(line.substr(NumStart, line.size() - NumStart), nullptr, 16);
+			line.erase(line.begin() + NumStart, line.end());
+			line += std::to_string(dec);
 		}
 
 		if (!first) std::cout << ",\n";
