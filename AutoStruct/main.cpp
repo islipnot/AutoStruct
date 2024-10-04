@@ -5,28 +5,29 @@ void PrintAlignedData(int flags, std::vector<std::string>& data)
 {
 	std::cout << "\n{\n";
 
-	size_t longest = 0;
-
-	for (std::string& line : data)
+	if (flags & ALIGN_EQUAL_SIGN)
 	{
-		const size_t EqualPos = line.find_first_of('=');
-		if (EqualPos > longest) longest = EqualPos;
-	}
+		size_t LongestName = 0;
 
-	for (std::string& line : data)
-	{
-		const size_t EqualPos = line.find_first_of('=') - 2;
-		size_t NameEnd = EqualPos;
-
-		for (size_t i = EqualPos - 1; line[i] == ' '; --i) 
+		for (std::string& line : data)
 		{
-			--NameEnd; 
+			const size_t EqualPos = line.find_first_of('=');
+			if (EqualPos > LongestName) LongestName = EqualPos;
 		}
 
-		const std::string fill(longest - EqualPos , ' ');
-		line.insert(NameEnd, fill);
+		for (std::string& line : data)
+		{
+			const size_t EqualPos = line.find_first_of('=') - 2;
+			size_t NameEnd = EqualPos;
 
-		std::cout << line << '\n';
+			for (size_t i = EqualPos - 1; line[i] == ' '; --i)
+			{
+				--NameEnd;
+			}
+
+			const std::string fill(LongestName - EqualPos, ' ');
+			line.insert(NameEnd, fill);
+		}
 	}
 
 	std::cout << "};\n";
@@ -34,7 +35,56 @@ void PrintAlignedData(int flags, std::vector<std::string>& data)
 
 void CvtCppStruct(int flags, std::ifstream& file)
 {
+	std::string line, FirstLine;
+	std::getline(file, line);
 
+	bool HasTypedef = false;
+
+	if (line[0] == 't')
+	{
+		HasTypedef = true;
+		FirstLine = line;
+		line.erase(0, 8);
+	}
+
+	std::cout << line << '\n';
+
+	if (line.find('{') == std::string::npos) 
+	{
+		std::getline(file, line);
+		std::cout << line << '\n';
+	}
+	
+	while (std::getline(file, line) && line[0] != '}')
+	{
+		const size_t semicolon = line.find_first_of(';');
+
+		if (semicolon + 1 < line.size()) 
+		{
+			line.erase(semicolon + 1, line.size() - semicolon);
+		}
+
+		std::cout << line << '\n';
+	}
+
+	std::cout << "};\n";
+
+	if (HasTypedef)
+	{
+		std::cout << '\n' << FirstLine << ' ';
+		line.erase(0, line.find_first_not_of(' ', 1));
+
+		const size_t comma = line.find_first_of(',');
+
+		if (comma != std::string::npos && comma < line.find_first_of(';'))
+		{
+			std::cout << line.substr(0, comma) << ";\n\n";
+			std::cout << FirstLine << ' ';
+			line.erase(0, comma + 2);
+		}
+
+		std::cout << line << '\n';
+	}
 }
 
 void CvtIdaEnum(int flags, std::ifstream& file)
@@ -59,7 +109,7 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 		const bool IsHex = line.back() == 'h';
 		if (IsHex) line.pop_back();
 
-		const size_t NumStart = line.find_last_of('=') + 2;
+		const size_t NumStart = line.find_first_of('=') + 2;
 
 		if (!decimal)
 		{
@@ -112,7 +162,7 @@ int GetFlags(int argc, wchar_t* argv[])
 	if (_wcsicmp(mode, L"CvtIda") == 0)
 		flags |= IDA_ENUM_TO_CPP;
 
-	else if (_wcsicmp(mode, L"eCvtCpp") == 0)
+	else if (_wcsicmp(mode, L"CvtCpp") == 0)
 		flags |= CPP_STRUCT_TO_IDA;
 
 	else if (_wcsicmp(mode, L"align") != 0)
