@@ -1,11 +1,6 @@
 #include "pch.h"
 #include "helpers.hpp"
 
-void PrintAlignedStr(int flags, std::string& line)
-{
-
-}
-
 void AlignData(int flags, std::ifstream& file)
 {
 
@@ -27,16 +22,31 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 
 	std::cout << line << "\n{\n";
 
+	bool first = true;
+	const bool decimal = (flags & HEX_OUTPUT) == 0;
+
 	while (std::getline(file, line))
 	{
 		line.erase(0, start);
 		line = "   " + line;
 
+		if (!decimal)
+		{
+			if (line.back() == 'h')
+				line.pop_back();
+			
+			const int NumStart = line.find_last_of(' ') + 1;
+			line.insert(line.begin() + NumStart, '0');
+			line.insert(line.begin() + NumStart + 1, 'x');
+		}
 
-		std::cout << line << '\n';
+		if (!first) std::cout << ",\n";
+		std::cout << line;
+
+		first = false;
 	}
 
-	std::cout << "};\n";
+	std::cout << "\n};\n";
 }
 
 int GetFlags(int argc, wchar_t* argv[])
@@ -56,7 +66,7 @@ int GetFlags(int argc, wchar_t* argv[])
 			flags |= ALIGN_VALUES;
 
 		else if (_wcsicmp(arg, L"hex") == 0)
-			flags |= HEX_VALUES;
+			flags |= HEX_OUTPUT;
 
 		else if (_wcsicmp(arg, L"A32") == 0)
 			flags |= ALIGN_NUM_32_BIT;

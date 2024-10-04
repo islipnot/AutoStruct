@@ -6,7 +6,7 @@ enum ARG_FLAGS
 	DEFAULT           = 0x01,
 	ALIGN_EQUAL_SIGN  = 0x02,
 	ALIGN_VALUES      = 0x04,
-	HEX_VALUES        = 0x08,
+	HEX_OUTPUT        = 0x08,
 	ALIGN_NUM_32_BIT  = 0x10,
 	ALIGN_NUM_64_BIT  = 0x20,
 	IDA_ENUM_TO_CPP   = 0x40,
