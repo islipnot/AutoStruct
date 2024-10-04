@@ -71,19 +71,23 @@ void CvtCppStruct(int flags, std::ifstream& file)
 
 	if (HasTypedef)
 	{
+		FirstLine.erase(7, 7);
 		std::cout << '\n' << FirstLine << ' ';
+
 		line.erase(0, line.find_first_not_of(' ', 1));
+		line.erase(line.find_first_of(';'), line.back());
 
-		const size_t comma = line.find_first_of(',');
-
-		if (comma != std::string::npos && comma < line.find_first_of(';'))
+		while (true)
 		{
+			const size_t comma = line.find_first_of(',');
+			if (comma == std::string::npos) break;
+
 			std::cout << line.substr(0, comma) << ";\n\n";
 			std::cout << FirstLine << ' ';
 			line.erase(0, comma + 2);
 		}
 
-		std::cout << line << '\n';
+		std::cout << line << ";\n";
 	}
 }
 
