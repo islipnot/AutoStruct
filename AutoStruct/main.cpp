@@ -1,9 +1,35 @@
 #include "pch.h"
 #include "helpers.hpp"
 
-void AlignData(int flags, std::ifstream& file)
+void PrintAlignedData(int flags, std::vector<std::string>& data)
 {
+	std::cout << "\n{\n";
 
+	size_t longest = 0;
+
+	for (std::string& line : data)
+	{
+		const size_t EqualPos = line.find_first_of('=');
+		if (EqualPos > longest) longest = EqualPos;
+	}
+
+	for (std::string& line : data)
+	{
+		const size_t EqualPos = line.find_first_of('=') - 2;
+		size_t NameEnd = EqualPos;
+
+		for (size_t i = EqualPos - 1; line[i] == ' '; --i) 
+		{
+			--NameEnd; 
+		}
+
+		const std::string fill(longest - EqualPos , ' ');
+		line.insert(NameEnd, fill);
+
+		std::cout << line << '\n';
+	}
+
+	std::cout << "};\n";
 }
 
 void CvtCppStruct(int flags, std::ifstream& file)
@@ -16,14 +42,14 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 	std::string line;
 	std::getline(file, line);
 
-	const int start = line.find_first_of(' ');
+	const size_t start = line.find_first_of(' ');
 	line.erase(0, start + 3);
 	line.erase(line.find_first_of(','), line.size() - 1);
 
-	std::cout << line << "\n{\n";
+	std::cout << line;
 
-	bool first = true;
 	const bool decimal = (flags & HEX_OUTPUT) == 0;
+	std::vector<std::string> enums;
 
 	while (std::getline(file, line))
 	{
@@ -33,28 +59,22 @@ void CvtIdaEnum(int flags, std::ifstream& file)
 		const bool IsHex = line.back() == 'h';
 		if (IsHex) line.pop_back();
 
-		const int NumStart = line.find_last_of(' ') + 1;
+		const size_t NumStart = line.find_last_of('=') + 2;
 
 		if (!decimal)
 		{
-			const int NumStart = line.find_last_of(' ') + 1;
-			line.insert(line.begin() + NumStart, '0');
-			line.insert(line.begin() + NumStart + 1, 'x');
+			line.insert(NumStart, "0x");
 		}
 		else if (IsHex)
 		{
-			const unsigned long dec = std::stoul(line.substr(NumStart, line.size() - NumStart), nullptr, 16);
 			line.erase(line.begin() + NumStart, line.end());
-			line += std::to_string(dec);
+			line += std::to_string(std::stoul(line.substr(NumStart, line.size() - NumStart), nullptr, 16));
 		}
 
-		if (!first) std::cout << ",\n";
-		std::cout << line;
-
-		first = false;
+		enums.emplace_back(line);
 	}
 
-	std::cout << "\n};\n";
+	PrintAlignedData(flags, enums);
 }
 
 int GetFlags(int argc, wchar_t* argv[])
@@ -131,9 +151,9 @@ int wmain(int argc, wchar_t* argv[])
 	{
 		CvtCppStruct(flags, file);
 	}
-	else
+	else // Apply alignment without conversion
 	{
-		AlignData(flags, file);
+		
 	}
 
 	file.close();
