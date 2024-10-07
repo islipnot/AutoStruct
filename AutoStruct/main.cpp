@@ -40,6 +40,11 @@ void PrintAlignedData(int flags, std::vector<std::string>& data)
 		}
 	}
 
+	for (std::string& line : data)
+	{
+		std::cout << line << '\n';
+	}
+
 	std::cout << "};\n";
 }
 
