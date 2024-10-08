@@ -34,11 +34,13 @@ void CvtIdaEnum(std::ifstream& file, size_t start)
 		{
 			HasComment = true;
 			comment = " //" + line.substr(CommentPos + 1);
-			line.erase(CommentPos - 1);
 		}
 
 		const size_t NumStart = line.find_first_of('=') + 2;
 		if (NumStart > LongestName) LongestName = NumStart;
+
+		const size_t NumEnd = line.find_first_of(' ', NumStart);
+		if (NumEnd != std::string::npos) line.erase(NumEnd);
 
 		if (line.back() == 'h')
 		{
