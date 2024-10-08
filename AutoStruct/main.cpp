@@ -1,222 +1,93 @@
 #include "pch.h"
 
-enum ARG_FLAGS
+void CvtIdaEnum(std::ifstream& file, size_t start)
 {
-	INVALID_ARGUMENT  = 0x00,
-	DEFAULT           = 0x01,
-	ALIGN_EQUAL_SIGN  = 0x02,
-	ALIGN_VALUES      = 0x04,
-	HEX_OUTPUT        = 0x08,
-	IDA_ENUM_TO_CPP   = 0x10,
-	CPP_STRUCT_TO_IDA = 0x20
-};
-
-void PrintAlignedData(int flags, std::vector<std::string>& data)
-{
-	std::cout << "\n{\n";
-
-	if (flags & ALIGN_EQUAL_SIGN)
-	{
-		size_t LongestName = 0;
-
-		for (std::string& line : data)
-		{
-			const size_t EqualPos = line.find_first_of('=');
-			if (EqualPos > LongestName) LongestName = EqualPos;
-		}
-
-		for (std::string& line : data)
-		{
-			const size_t EqualPos = line.find_first_of('=') - 2;
-			size_t NameEnd = EqualPos;
-
-			for (size_t i = EqualPos - 1; line[i] == ' '; --i)
-			{
-				--NameEnd;
-			}
-
-			const std::string fill(LongestName - EqualPos, ' ');
-			line.insert(NameEnd, fill);
-		}
-	}
-
-	for (std::string& line : data)
-	{
-		std::cout << line << '\n';
-	}
-
-	std::cout << "};\n";
-}
-
-void CvtCppStruct(int flags, std::ifstream& file)
-{
-	std::string line, FirstLine;
-	std::getline(file, line);
-
-	bool HasTypedef = false;
-
-	if (line[0] == 't')
-	{
-		HasTypedef = true;
-		FirstLine = line;
-		line.erase(0, 8);
-	}
-
-	std::cout << line << '\n';
-
-	if (line.find('{') == std::string::npos) 
-	{
-		std::getline(file, line);
-		std::cout << line << '\n';
-	}
+	std::string line, comment;
+	bool HasComment = false;
 	
-	while (std::getline(file, line) && line[0] != '}')
-	{
-		const size_t semicolon = line.find_first_of(';');
-
-		if (semicolon + 1 < line.size()) 
-		{
-			line.erase(semicolon + 1, line.size() - semicolon);
-		}
-
-		std::cout << line << '\n';
-	}
-
-	std::cout << "};\n";
-
-	if (HasTypedef)
-	{
-		FirstLine.erase(7, 7);
-		std::cout << '\n' << FirstLine << ' ';
-
-		line.erase(0, line.find_first_not_of(' ', 1));
-		line.erase(line.find_first_of(';'), line.back());
-
-		while (true)
-		{
-			const size_t comma = line.find_first_of(',');
-			if (comma == std::string::npos) break;
-
-			std::cout << line.substr(0, comma) << ";\n\n";
-			std::cout << FirstLine << ' ';
-			line.erase(0, comma + 2);
-		}
-
-		std::cout << line << ";\n";
-	}
-}
-
-void CvtIdaEnum(int flags, std::ifstream& file)
-{
-	std::string line;
-	std::getline(file, line);
-
-	const size_t start = line.find_first_of(' ');
-	line.erase(0, start + 3);
-	line.erase(line.find_first_of(','), line.size() - 1);
-
-	std::cout << line;
-
-	const bool decimal = (flags & HEX_OUTPUT) == 0;
-	std::vector<std::string> lines;
-
 	while (std::getline(file, line))
 	{
 		line.erase(0, start);
-		line = "   " + line;
+		line.insert(0, "   ");
 
-		const bool IsHex = line.back() == 'h';
-		if (IsHex) line.pop_back();
+		const size_t CommentPos = line.find_first_of(';');
+		if (CommentPos != std::string::npos)
+		{
+			HasComment = true;
+			comment = " //" + line.substr(CommentPos + 1);
+			line.erase(CommentPos - 1);
+		}
 
 		const size_t NumStart = line.find_first_of('=') + 2;
 
-		if (!decimal)
+		if (line.back() == 'h')
 		{
+			line.pop_back();
 			line.insert(NumStart, "0x");
 		}
-		else if (IsHex)
+
+		line.erase(NumStart - 3, 1); // Removing the extra space IDA adds between var name and equal sign
+
+		std::cout << line << ',';
+
+		if (HasComment)
 		{
-			line.erase(line.begin() + NumStart, line.end());
-			line += std::to_string(std::stoul(line.substr(NumStart, line.size() - NumStart), nullptr, 16));
+			HasComment = false;
+			std::cout << comment;
 		}
 
-		lines.emplace_back(line);
+		std::cout << '\n';
 	}
 
-	PrintAlignedData(flags, lines);
-}
-
-int GetFlags(int argc, wchar_t* argv[])
-{
-	int flags = 0;
-
-	// Parsing user specified flags, if any
-
-	for (int i = 3; i < argc; ++i)
-	{
-		const wchar_t* arg = argv[i];
-
-		if (_wcsicmp(arg, L"eAlign") == 0)
-			flags |= ALIGN_EQUAL_SIGN;
-
-		else if (_wcsicmp(arg, L"vAlign") == 0)
-			flags |= ALIGN_VALUES;
-
-		else if (_wcsicmp(arg, L"hex") == 0)
-			flags |= HEX_OUTPUT;
-
-		else return INVALID_ARGUMENT;
-	}
-
-	// Setting output type (there is no IDA->CPP struct conversion or CPP->IDA enum conversion)
-
-	const wchar_t* mode = argv[1];
-
-	if (_wcsicmp(mode, L"CvtIda") == 0)
-		flags |= IDA_ENUM_TO_CPP;
-
-	else if (_wcsicmp(mode, L"CvtCpp") == 0)
-		flags |= CPP_STRUCT_TO_IDA;
-
-	else if (_wcsicmp(mode, L"align") != 0)
-		return INVALID_ARGUMENT;
-
-	return flags;
+	std::cout << "};\n";
 }
 
 int wmain(int argc, wchar_t* argv[])
 {
-	if (argc < 3)
+	/* TODO
+	* - Add back flags that allow more customizable output, and handle whitespace/comments better
+	*/
+
+	if (argc < 2)
 	{
 		std::cout << "Insufficient arguments\n";
 		return 1;
 	}
 
-	const int flags = GetFlags(argc, argv);
-	if (flags == INVALID_ARGUMENT)
-	{
-		std::cout << "Invalid arguments\n";
-		return 1;
-	}
-
-	std::ifstream file(argv[2]);
+	std::ifstream file(argv[1]);
 	if (file.fail())
 	{
 		std::cout << "Invalid path\n";
 		return 1;
 	}
 
-	if (flags & IDA_ENUM_TO_CPP)
+	std::string line;
+	std::getline(file, line);
+
+	switch (line[0])
 	{
-		CvtIdaEnum(flags, file);
+	case 'F': // IDA Enum
+	{
+		const size_t start = line.find_first_of(' ');
+
+		line.erase(0, start + 3);
+		line.erase(line.find_first_of(','));
+
+		std::cout << line << "\n{\n";
+
+		CvtIdaEnum(file, start);
+		break;
 	}
-	else if (flags & CPP_STRUCT_TO_IDA)
+
+	case 't': // typedef
 	{
-		CvtCppStruct(flags, file);
+		break;
 	}
-	else
+
+	default: // enum/struct
 	{
-		// Will write a function that deals with alignment only later
+
+	}
 	}
 
 	file.close();

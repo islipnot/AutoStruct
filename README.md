@@ -2,4 +2,5 @@
 Automatic alignment and syntax conversion of IDA/C++ enums and structs.
 
 ## Usage
-Argument format: &lt;output-mode&gt; &lt;source-file&gt; &lt;flags, optional&gt;
+Argument format: &lt;FilePath&gt;
+The type of structure will automatically be detected, and alignment/conversion will be applied
