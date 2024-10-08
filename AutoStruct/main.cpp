@@ -36,7 +36,13 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 	
 	while (std::getline(file, line) && line.find('}') == std::string::npos)
 	{
+		if (flags & RemoveWhitespace && line.find('/') == std::string::npos && line.find(';') == std::string::npos && line.find('=') == std::string::npos)
+		{
+			continue;
+		}
+
 		size_t pos = line.find_first_not_of(' ');
+
 		if (pos == 0)
 		{
 			pos = line.find_first_not_of('\t');
@@ -71,7 +77,6 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 {
 	std::string line, comment;
-	bool HasComment = false;
 
 	std::vector<std::string> lines;
 	size_t LongestName = 0;
@@ -81,7 +86,9 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 		line.erase(0, start);
 		line.insert(0, "   "); // Visual Studio's indentation
 
+		bool HasComment = false;
 		const size_t CommentPos = line.find_first_of(';');
+
 		if (CommentPos != std::string::npos)
 		{
 			HasComment = true;
@@ -105,7 +112,6 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 
 		if (HasComment)
 		{
-			HasComment = false;
 			line.insert(line.size(), comment);
 		}
 
