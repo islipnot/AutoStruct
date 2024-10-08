@@ -24,10 +24,8 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName)
 	std::cout << "};\n";
 }
 
-void HandleCppData(std::ifstream& file)
+void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
-	std::string line;
-
 	std::vector<std::string> lines;
 	size_t LongestName = 0;
 	
@@ -59,7 +57,7 @@ void HandleCppData(std::ifstream& file)
 	AlignAndPrint(lines, LongestName - 4);
 }
 
-void CvtIdaEnum(std::ifstream& file, size_t start)
+void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 {
 	std::string line, comment;
 	bool HasComment = false;
@@ -125,7 +123,8 @@ int wmain(int argc, wchar_t* argv[])
 
 	std::string line, FirstLine;
 	std::getline(file, line);
-
+	FirstLine = line;
+	
 	// Getting flags
 
 	int flags = 0;
@@ -148,20 +147,34 @@ int wmain(int argc, wchar_t* argv[])
 	{
 	case 'F': // IDA Enum
 	{
-		const size_t start = line.find_first_of(' ');
+		const size_t pos = line.find_first_of(' ');
 
-		line.erase(0, start + 3);
+		line.erase(0, pos + 3);
 		line.erase(line.find_first_of(','));
 
 		std::cout << line << "\n{\n";
 
-		CvtIdaEnum(file, start);
+		CvtIdaEnum(file, pos, flags);
 		break;
 	}
 
 	case 't': // typedef
 	{
-		if (flags & ConvertTypedef) line.erase(0, 8);
+		if (flags & ConvertTypedef)
+		{
+			line.erase(0, 8);
+
+			size_t pos = FirstLine.find_first_of(' ', 15);
+			if (pos == std::string::npos)
+			{
+				pos = FirstLine.find_first_of('/', 15);
+			}
+			if (pos != std::string::npos)
+			{
+				FirstLine.erase(pos);
+			}
+		}
+
 		[[fallthrough]];
 	}
 
@@ -176,8 +189,36 @@ int wmain(int argc, wchar_t* argv[])
 		}
 		else std::cout << '\n';
 
-		HandleCppData(file);
+		HandleCppData(file, line, flags);
 	}
+	}
+
+	if (flags & ConvertTypedef)
+	{
+		size_t pos = line.find_first_not_of(' ', 1);
+
+		if (pos == std::string::npos)
+		{
+			std::getline(file, line);
+		}
+		else line.erase(0, line.find_first_not_of(' ', 1) - 1);
+
+		bool ShouldBreak = false;
+		while (true)
+		{
+			pos = line.find_first_of(',');
+			if (pos == std::string::npos)
+			{
+				ShouldBreak = true;
+				pos = line.find_first_of(';');
+			}
+
+			std::cout << '\n' << FirstLine << line.substr(0, pos) << ";\n";
+
+			if (ShouldBreak) break;
+
+			line.erase(0, pos + 1);
+		}
 	}
 
 	file.close();
