@@ -7,6 +7,6 @@ Automatic alignment and syntax conversion of IDA/C++ enums and structs.
 - The type of structure will automatically be detected, and alignment/conversion will be applied.</br>
 
 ### Arguments (Case-Insensitive)
-- "Convert": formats the struct/enum typedef's for IDA, so that the struct and its typedef's can be inserted at once into local types.
+- "Convert": Formats the struct/enum typedef's for IDA, so that the struct and its typedefs can all be inserted into local types at once.
 - "Rws": Removes empty lines (rws = remove whitespace).
 - "Hex": Converts all decimal to hexidecimal.
