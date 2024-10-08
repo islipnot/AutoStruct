@@ -4,10 +4,11 @@ enum ARG_FLAGS
 {
 	HexVariables     = 0,
 	RemoveWhitespace = 1,
-	ConvertTypedef   = 2
+	ConvertTypedef   = 2,
+	HasTypedef       = 4
 };
 
-void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName)
+void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, int flags)
 {
 	for (std::string& line : lines)
 	{
@@ -21,7 +22,11 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName)
 		std::cout << line << '\n';
 	}
 
-	std::cout << "};\n";
+	if (!(flags & HasTypedef))
+	{
+		std::cout << "};\n";
+	}
+	else std::cout << '\n';
 }
 
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
@@ -54,7 +59,13 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		lines.emplace_back(line);
 	}
 
-	AlignAndPrint(lines, LongestName - 4);
+	if (flags & HasTypedef && !(flags & ConvertTypedef))
+	{
+		std::getline(file, line);
+		lines.emplace_back(line);
+	}
+
+	AlignAndPrint(lines, LongestName, flags);
 }
 
 void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
@@ -101,7 +112,7 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 		lines.emplace_back(line);
 	}
 
-	AlignAndPrint(lines, LongestName - 4);
+	AlignAndPrint(lines, LongestName - 4, flags);
 }
 
 int wmain(int argc, wchar_t* argv[])
@@ -160,6 +171,8 @@ int wmain(int argc, wchar_t* argv[])
 
 	case 't': // typedef
 	{
+		flags |= HasTypedef;
+
 		if (flags & ConvertTypedef)
 		{
 			line.erase(0, 8);
@@ -214,9 +227,8 @@ int wmain(int argc, wchar_t* argv[])
 			}
 
 			std::cout << '\n' << FirstLine << line.substr(0, pos) << ";\n";
-
+ 
 			if (ShouldBreak) break;
-
 			line.erase(0, pos + 1);
 		}
 	}
