@@ -1,9 +1,28 @@
 #include "pch.h"
 
+void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName)
+{
+	for (std::string& line : lines)
+	{
+		const size_t EqualPos = line.find_first_of('=') - 1;
+		if (EqualPos < LongestName)
+		{
+			line.insert(EqualPos, LongestName - EqualPos, ' ');
+		}
+
+		std::cout << line << '\n';
+	}
+
+	std::cout << "};\n";
+}
+
 void CvtIdaEnum(std::ifstream& file, size_t start)
 {
 	std::string line, comment;
 	bool HasComment = false;
+
+	std::vector<std::string> lines;
+	size_t LongestName = 0;
 	
 	while (std::getline(file, line))
 	{
@@ -19,6 +38,7 @@ void CvtIdaEnum(std::ifstream& file, size_t start)
 		}
 
 		const size_t NumStart = line.find_first_of('=') + 2;
+		if (NumStart > LongestName) LongestName = NumStart;
 
 		if (line.back() == 'h')
 		{
@@ -27,19 +47,18 @@ void CvtIdaEnum(std::ifstream& file, size_t start)
 		}
 
 		line.erase(NumStart - 3, 1); // Removing the extra space IDA adds between var name and equal sign
-
-		std::cout << line << ',';
+		line += ',';
 
 		if (HasComment)
 		{
 			HasComment = false;
-			std::cout << comment;
+			line.insert(line.size(), comment);
 		}
 
-		std::cout << '\n';
+		lines.emplace_back(line);
 	}
 
-	std::cout << "};\n";
+	AlignAndPrint(lines, LongestName - 4);
 }
 
 int wmain(int argc, wchar_t* argv[])
