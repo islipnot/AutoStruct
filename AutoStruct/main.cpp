@@ -33,7 +33,15 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, in
 
 void CvtToHex(std::string& line, size_t NumPos)
 {
-	const unsigned long number = std::stoul(line.substr(NumPos));
+	unsigned long number;
+
+	if (line[NumPos] == '-')
+	{
+		++NumPos;
+		number = std::stol(line.substr(NumPos));
+	}
+	else number = std::stoul(line.substr(NumPos));
+
 	if (number < 0xA)
 	{
 		line.insert(NumPos, "0x");
@@ -146,7 +154,6 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 
 		lines.emplace_back(line);
 	}
-
 	AlignAndPrint(lines, LongestName - 4, flags);
 }
 
