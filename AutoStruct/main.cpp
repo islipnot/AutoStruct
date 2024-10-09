@@ -1,11 +1,13 @@
 #include "pch.h"
 
+#define npos std::string::npos
+
 enum ARG_FLAGS
 {
-	HexVariables     = 0,
-	RemoveWhitespace = 1,
-	ConvertTypedef   = 2,
-	HasTypedef       = 4
+	DecToHex         = 1,
+	RemoveWhitespace = 2,
+	ConvertTypedef   = 4,
+	HasTypedef       = 8
 };
 
 void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, int flags)
@@ -14,9 +16,9 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, in
 	{
 		const size_t EqualPos = line.find_first_of('=');
 
-		if (EqualPos < LongestName)
+		if (EqualPos != npos && EqualPos + 2 < LongestName)
 		{
-			line.insert(EqualPos, LongestName - EqualPos, ' ');
+			line.insert(EqualPos, LongestName - (EqualPos + 2) , ' ');
 		}
 
 		std::cout << line << '\n';
@@ -29,37 +31,60 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, in
 	else std::cout << '\n';
 }
 
+void CvtToHex(std::string& line, size_t NumPos)
+{
+	const unsigned long number = std::stoul(line.substr(NumPos));
+	if (number < 0xA)
+	{
+		line.insert(NumPos, "0x");
+		return;
+	}
+
+	size_t NumEnd = NumPos + 1;
+	while (std::isdigit(line[NumEnd]))
+	{
+		++NumEnd;
+	}
+	NumEnd -= NumPos;
+
+	line.erase(NumPos, NumEnd);
+	line.insert(NumPos, std::format("0x{:X}", number));
+}
+
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
 	std::vector<std::string> lines;
 	size_t LongestName = 0;
 	
-	while (std::getline(file, line) && line.find('}') == std::string::npos)
+	while (std::getline(file, line) && line.find('}') == npos)
 	{
-		if (flags & RemoveWhitespace && line.find('/') == std::string::npos && line.find(';') == std::string::npos && line.find('=') == std::string::npos)
+		if (flags & RemoveWhitespace && line.find('/') == npos && line.find(';') == npos && line.find('=') == npos)
 		{
 			continue;
 		}
 
-		size_t pos = line.find_first_not_of(' ');
-
-		if (pos == 0)
-		{
-			pos = line.find_first_not_of('\t');
+		size_t pos = 0;
+		while (line[pos] == ' ' || line[pos] == '\t') 
+		{ 
+			++pos; 
 		}
 
-		if (pos != std::string::npos)
-		{
-			line.erase(0, pos);
-		}
-
-		line.insert(0, 4, ' ');
+		if (pos) line.erase(0, pos);
+		line.insert(0, 4, ' '); 
 
 		pos = line.find_first_of('=');
-		if (pos != std::string::npos)
+		if (pos != npos)
 		{
 			pos += 2;
-			if (pos > LongestName) LongestName = pos;
+			if (pos > LongestName)
+			{
+				LongestName = pos;
+			}
+
+			if (flags & DecToHex)
+			{
+				CvtToHex(line, pos);
+			}
 		}
 
 		lines.emplace_back(line);
@@ -89,7 +114,7 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 		bool HasComment = false;
 		const size_t CommentPos = line.find_first_of(';');
 
-		if (CommentPos != std::string::npos)
+		if (CommentPos != npos)
 		{
 			HasComment = true;
 			comment = " //" + line.substr(CommentPos + 1);
@@ -99,12 +124,16 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 		if (NumStart > LongestName) LongestName = NumStart + 1;
 
 		const size_t NumEnd = line.find_first_of(' ', NumStart);
-		if (NumEnd != std::string::npos) line.erase(NumEnd);
+		if (NumEnd != npos) line.erase(NumEnd);
 
 		if (line.back() == 'h')
 		{
 			line.pop_back();
 			line.insert(NumStart, "0x");
+		}
+		else if (flags & DecToHex)
+		{
+			CvtToHex(line, NumStart);
 		}
 
 		line.erase(NumStart - 3, 1); // Removing the extra space IDA adds between var name and equal sign
@@ -155,7 +184,7 @@ int wmain(int argc, wchar_t* argv[])
 			flags |= RemoveWhitespace;
 
 		else if (_wcsicmp(argv[i], L"hex") == 0)
-			flags |= HexVariables;
+			flags |= DecToHex;
 	}
 
 	// Handling the provided data accordingly
@@ -184,11 +213,11 @@ int wmain(int argc, wchar_t* argv[])
 			line.erase(0, 8);
 
 			size_t pos = FirstLine.find_first_of(' ', 15);
-			if (pos == std::string::npos)
+			if (pos == npos)
 			{
 				pos = FirstLine.find_first_of('/', 15);
 			}
-			if (pos != std::string::npos)
+			if (pos != npos)
 			{
 				FirstLine.erase(pos);
 			}
@@ -201,7 +230,7 @@ int wmain(int argc, wchar_t* argv[])
 	{
 		std::cout << line;
 
-		if (line.find('{') == std::string::npos)
+		if (line.find('{') == npos)
 		{
 			std::getline(file, line);
 			std::cout << "\n{\n";
@@ -212,11 +241,13 @@ int wmain(int argc, wchar_t* argv[])
 	}
 	}
 
+	// Formating typedefs to IDA local type insertion syntax
+
 	if (flags & ConvertTypedef)
 	{
 		size_t pos = line.find_first_not_of(' ', 1);
 
-		if (pos == std::string::npos)
+		if (pos == npos)
 		{
 			std::getline(file, line);
 		}
@@ -226,7 +257,7 @@ int wmain(int argc, wchar_t* argv[])
 		while (true)
 		{
 			pos = line.find_first_of(',');
-			if (pos == std::string::npos)
+			if (pos == npos)
 			{
 				ShouldBreak = true;
 				pos = line.find_first_of(';');
