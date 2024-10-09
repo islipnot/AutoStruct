@@ -14,6 +14,8 @@ Automatic alignment and syntax conversion of IDA/C++ enums and structs.
 - "Rws": Removes empty lines (rws = remove whitespace).
 - "Hex": Converts all decimal to hexidecimal.
 
+## Screenshots
+
 ![Enum Conversion](.github/EnumConversion.png)
 
 ![Enum Alignment](.github/EnumAlignment.png)
