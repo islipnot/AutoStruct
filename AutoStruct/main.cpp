@@ -16,9 +16,9 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, in
 	{
 		const size_t EqualPos = line.find_first_of('=');
 
-		if (EqualPos != npos && EqualPos + 2 < LongestName)
+		if (EqualPos != npos && EqualPos - 1 < LongestName)
 		{
-			line.insert(EqualPos, LongestName - (EqualPos + 2) , ' ');
+			line.insert(EqualPos, LongestName - (EqualPos - 1), ' ');
 		}
 
 		std::cout << line << '\n';
@@ -38,7 +38,7 @@ void CvtToHex(std::string& line, size_t NumPos)
 		if (!std::isdigit(line[NumPos])) ++NumPos;
 
 		size_t NumEnd = NumPos + 1;
-		while (std::isdigit(line[NumEnd]) || line[NumEnd] == 'x')
+		while (std::isdigit(line[NumEnd]) || (line[NumEnd - 1] == '0' && line[NumEnd] == 'x'))
 		{
 			++NumEnd;
 		}
@@ -51,6 +51,9 @@ void CvtToHex(std::string& line, size_t NumPos)
 			NumPos = NumEnd + 2;
 		}
 		else NumPos = NumEnd;
+
+		if (NumEnd == line.size() - 2)
+			return;
 
 		for (char* AfterNum = &line[NumPos]; !std::isdigit(*AfterNum); ++AfterNum, ++NumPos)
 		{
@@ -84,7 +87,6 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		pos = line.find_first_of('=');
 		if (pos != npos)
 		{
-			pos += 2;
 			if (pos > LongestName)
 			{
 				LongestName = pos;
@@ -92,7 +94,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 
 			if (flags & DecToHex)
 			{
-				CvtToHex(line, pos);
+				CvtToHex(line, pos + 2);
 			}
 		}
 
@@ -155,6 +157,8 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 
 		lines.emplace_back(line);
 	}
+
+	lines.back().pop_back(); // removing comma
 	AlignAndPrint(lines, LongestName - 4, flags);
 }
 
@@ -197,9 +201,9 @@ int wmain(int argc, wchar_t* argv[])
 
 	// Handling the provided data accordingly
 
-	switch (line[0])
-	{
-	case 'F': // IDA Enum
+	std::cout << '\n';
+
+	if (std::isdigit(line[0]) || line[0] < 71) // IDA Enum
 	{
 		const size_t pos = line.find_first_of(' ');
 
@@ -209,33 +213,31 @@ int wmain(int argc, wchar_t* argv[])
 		std::cout << line << "\n{\n";
 
 		CvtIdaEnum(file, pos, flags);
-		break;
 	}
-
-	case 't': // typedef
+	else
 	{
-		flags |= HasTypedef;
-
-		if (flags & ConvertTypedef)
+		if (line[0] == 't') // typedef
 		{
-			line.erase(0, 8);
+			flags |= HasTypedef;
 
-			size_t pos = FirstLine.find_first_of(' ', 15);
-			if (pos == npos)
+			if (flags & ConvertTypedef)
 			{
-				pos = FirstLine.find_first_of('/', 15);
-			}
-			if (pos != npos)
-			{
-				FirstLine.erase(pos);
+				line.erase(0, 8);
+
+				size_t pos = FirstLine.find_first_of(' ', 15);
+				if (pos == npos)
+				{
+					pos = FirstLine.find_first_of('/', 15);
+				}
+				if (pos != npos)
+				{
+					FirstLine.erase(pos);
+				}
 			}
 		}
 
-		[[fallthrough]];
-	}
+		// C++ struct/enum
 
-	default: // enum/struct
-	{
 		std::cout << line;
 
 		if (line.find('{') == npos)
@@ -246,7 +248,6 @@ int wmain(int argc, wchar_t* argv[])
 		else std::cout << '\n';
 
 		HandleCppData(file, line, flags);
-	}
 	}
 
 	// Formating typedefs to IDA local type insertion syntax
