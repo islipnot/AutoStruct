@@ -33,30 +33,31 @@ void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, in
 
 void CvtToHex(std::string& line, size_t NumPos)
 {
-	unsigned long number;
-
-	if (line[NumPos] == '-')
+	while (true)
 	{
-		++NumPos;
-		number = std::stol(line.substr(NumPos));
-	}
-	else number = std::stoul(line.substr(NumPos));
+		if (!std::isdigit(line[NumPos])) ++NumPos;
 
-	if (number < 0xA)
-	{
-		line.insert(NumPos, "0x");
-		return;
-	}
+		size_t NumEnd = NumPos + 1;
+		while (std::isdigit(line[NumEnd]) || line[NumEnd] == 'x')
+		{
+			++NumEnd;
+		}
 
-	size_t NumEnd = NumPos + 1;
-	while (std::isdigit(line[NumEnd]))
-	{
-		++NumEnd;
-	}
-	NumEnd -= NumPos;
+		if (line[NumPos + 1] != 'x')
+		{
+			const unsigned long number = std::stoul(line.substr(NumPos));
+			line.erase(NumPos, NumEnd - NumPos);
+			line.insert(NumPos, std::format("0x{:X}", number));
+			NumPos = NumEnd + 2;
+		}
+		else NumPos = NumEnd;
 
-	line.erase(NumPos, NumEnd);
-	line.insert(NumPos, std::format("0x{:X}", number));
+		for (char* AfterNum = &line[NumPos]; !std::isdigit(*AfterNum); ++AfterNum, ++NumPos)
+		{
+			if (*AfterNum == ';' || *AfterNum == ',' || AfterNum[1] == '/')
+				return;
+		}
+	}
 }
 
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
