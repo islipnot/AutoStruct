@@ -2,7 +2,7 @@
 
 #define npos std::string::npos
 
-enum ARG_FLAGS
+enum PROCESSING_FLAGS
 {
 	DecToHex         = 1,
 	RemoveWhitespace = 2,
@@ -10,15 +10,23 @@ enum ARG_FLAGS
 	HasTypedef       = 8
 };
 
-void AlignAndPrint(std::vector<std::string>& lines, const size_t LongestName, int flags)
+struct LineData
 {
-	for (std::string& line : lines)
-	{
-		const size_t EqualPos = line.find_first_of('=');
+	std::string line;
+	size_t AlignmentIndex;
+};
 
-		if (EqualPos != npos && EqualPos - 1 < LongestName)
+void PrintCppData(std::vector<LineData>& lines, std::vector<int>& AlignmentValues, int flags)
+{
+	for (LineData& data : lines)
+	{
+		std::string& line = data.line;
+		const size_t EqualPos = line.find_first_of('=');
+		const size_t FurthestEqual = AlignmentValues[data.AlignmentIndex];
+
+		if (EqualPos != npos && EqualPos - 1 < FurthestEqual)
 		{
-			line.insert(EqualPos, LongestName - (EqualPos - 1), ' ');
+			line.insert(EqualPos, FurthestEqual - EqualPos, ' ');
 		}
 
 		std::cout << line << '\n';
@@ -65,16 +73,28 @@ void CvtToHex(std::string& line, size_t NumPos)
 
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
-	std::vector<std::string> lines;
-	size_t LongestName = 0;
+	std::vector<LineData> lines;
+	std::vector<int> AlignmentValues = { 0 };
 
-	bool multiline = false; /* Multiline Comments */
+	int SpaceCount = 4; // Number of spaces at the start of a line
+	bool multiline = false; // Multiline comments
+	bool HasOpenBracket = false;
 	
-	while (std::getline(file, line) && line.find('}') == npos)
+	while (std::getline(file, line))
 	{
-		size_t pos = line.find_first_of('/');
+		if (line.find('}') != npos)
+		{
+			if (SpaceCount > 4)
+			{
+				SpaceCount -= 4;
+				AlignmentValues.emplace_back(0);
+			}
+			else break;
+		}
 
 		// Handling comments and empty lines
+
+		size_t pos = line.find_first_of('/');
 
 		if (multiline)
 		{
@@ -103,9 +123,20 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			}
 			while (strcmp(line.substr(pos).c_str(), "*/"));
 		}
-		else if (flags & RemoveWhitespace && line.find('/') == npos && line.find(';') == npos && line.find('=') == npos)
+		else if (flags & RemoveWhitespace && pos == npos && line.find(';') == npos && line.find('=') == npos && line.find('u') == npos && line.find('s') == npos && line.find('{') == npos)
 		{
 			continue;
+		}
+
+		// Checking if there is an opening bracket, indicating a nested struct/union
+
+		pos = line.find_first_of('/');
+		if (pos == npos) pos = line.size();
+
+		if (line.substr(0, pos).find('{') != npos)
+		{
+			AlignmentValues.emplace_back(0);
+			HasOpenBracket = true;
 		}
 
 		// Removing/adding extra whitespace at the start of the line for alignment
@@ -117,16 +148,16 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		}
 
 		if (pos) line.erase(0, pos);
-		line.insert(0, 4, ' '); 
+		line.insert(0, SpaceCount, ' ');
 
 		// Aligning members and converting decimal values to hex if requested
 
 		pos = line.find_first_of('=');
 		if (pos != npos)
 		{
-			if (pos > LongestName)
+			if (pos > AlignmentValues.back())
 			{
-				LongestName = pos;
+				AlignmentValues.back() = pos;
 			}
 
 			if (flags & DecToHex)
@@ -135,7 +166,13 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			}
 		}
 
-		lines.emplace_back(line);
+		if (HasOpenBracket)
+		{
+			SpaceCount += 4;
+			HasOpenBracket = false;
+		}
+
+		lines.emplace_back(LineData{ line, AlignmentValues.size() - 1 });
 	}
 
 	if (flags & HasTypedef && !(flags & ConvertTypedef))
@@ -143,8 +180,25 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		std::getline(file, line);
 		lines.emplace_back(line);
 	}
+	
+	PrintCppData(lines, AlignmentValues, flags);
+}
 
-	AlignAndPrint(lines, LongestName, flags);
+void PrintIdaEnum(std::vector<std::string>& lines, size_t LongestName, int flags)
+{
+	for (std::string& line : lines)
+	{
+		const size_t EqualPos = line.find_first_of('=');
+
+		if (EqualPos != npos && EqualPos - 1 < LongestName)
+		{
+			line.insert(EqualPos, LongestName - (EqualPos - 1), ' ');
+		}
+
+		std::cout << line << '\n';
+	}
+
+	std::cout << "};\n";
 }
 
 void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
@@ -196,7 +250,7 @@ void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
 	}
 
 	lines.back().pop_back(); // removing comma
-	AlignAndPrint(lines, LongestName - 4, flags);
+	PrintIdaEnum(lines, LongestName - 4, flags);
 }
 
 int wmain(int argc, wchar_t* argv[])
@@ -253,7 +307,7 @@ int wmain(int argc, wchar_t* argv[])
 	}
 	else
 	{
-		if (line[0] == 't') // typedef
+		if (line[0] == 't')
 		{
 			flags |= HasTypedef;
 
