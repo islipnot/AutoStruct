@@ -16,6 +16,8 @@ Automatic alignment and syntax conversion of IDA/C++ enums and structs.
 
 ## Screenshots
 
+![Struct Conversion](.github/StructConversion.png)
+
 ![Struct Alignment](.github/StructAlignment.png)
 
 ![Enum Conversion](.github/EnumConversion.png)
