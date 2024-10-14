@@ -16,7 +16,7 @@ struct LineData
 	size_t AlignmentIndex;
 };
 
-void PrintCppData(std::vector<LineData>& lines, std::vector<int>& AlignmentValues, int flags)
+void PrintCppData(std::vector<LineData>& lines, std::vector<size_t>& AlignmentValues, int flags)
 {
 	for (LineData& data : lines)
 	{
@@ -32,7 +32,7 @@ void PrintCppData(std::vector<LineData>& lines, std::vector<int>& AlignmentValue
 		std::cout << line << '\n';
 	}
 
-	if (!(flags & HasTypedef))
+	if (!(flags & HasTypedef) || flags & ConvertTypedef)
 	{
 		std::cout << "};\n";
 	}
@@ -74,7 +74,7 @@ void CvtToHex(std::string& line, size_t NumPos)
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
 	std::vector<LineData> lines;
-	std::vector<int> AlignmentValues = { 0 };
+	std::vector<size_t> AlignmentValues = { 0 };
 
 	int SpaceCount = 4; // Number of spaces at the start of a line
 	bool multiline = false; // Multiline comments
@@ -201,9 +201,9 @@ void PrintIdaEnum(std::vector<std::string>& lines, size_t LongestName, int flags
 	std::cout << "};\n";
 }
 
-void CvtIdaEnum(std::ifstream& file, size_t start, int flags)
+void CvtIdaEnum(std::ifstream& file, std::string& line, size_t start, int flags)
 {
-	std::string line, comment;
+	std::string comment;
 
 	std::vector<std::string> lines;
 	size_t LongestName = 0;
@@ -303,7 +303,7 @@ int wmain(int argc, wchar_t* argv[])
 
 		std::cout << line << "\n{\n";
 
-		CvtIdaEnum(file, pos, flags);
+		CvtIdaEnum(file, line, pos, flags);
 	}
 	else
 	{
