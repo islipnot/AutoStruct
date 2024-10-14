@@ -4,10 +4,11 @@
 
 enum PROCESSING_FLAGS
 {
-	DecToHex   = 1,
-	RemoveWs   = 2,
-	CppConversion     = 4,
-	HasTypedef = 8
+	DecToHex      = 1,
+	RemoveWs      = 2,
+	CppConversion = 4,
+	HasTypedef    = 8,
+	IsEnum        = 16
 };
 
 struct LineData
@@ -42,11 +43,26 @@ void PrintCppData(std::vector<LineData>& lines, std::vector<size_t>& AlignmentVa
 	else std::cout << '\n';
 }
 
-void CvtToHex(std::string& line, size_t NumPos)
+void CvtToHex(std::string& line, size_t NumPos, char EndSignifier)
 {
-	while (true)
+	bool IgnoreSignifier = false;
+
+	while (line[NumPos] != EndSignifier || IgnoreSignifier)
 	{
-		if (!std::isdigit(line[NumPos])) ++NumPos;
+		if (!std::isdigit(line[NumPos]))
+		{
+			if (line[NumPos] == '(')
+			{
+				IgnoreSignifier = true;
+			}
+			else if (line[NumPos] == ')')
+			{
+				IgnoreSignifier = false;
+			}
+
+			++NumPos;
+			continue;
+		}
 
 		size_t NumEnd = NumPos + 1;
 		while (std::isdigit(line[NumEnd]) || (line[NumEnd - 1] == '0' && line[NumEnd] == 'x'))
@@ -68,7 +84,7 @@ void CvtToHex(std::string& line, size_t NumPos)
 
 		for (char* AfterNum = &line[NumPos]; !std::isdigit(*AfterNum); ++AfterNum, ++NumPos)
 		{
-			if (*AfterNum == ';' || *AfterNum == ',' || AfterNum[1] == '/')
+			if (*AfterNum == EndSignifier || AfterNum[1] == '/')
 				return;
 		}
 	}
@@ -173,7 +189,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 
 				if (flags & DecToHex)
 				{
-					CvtToHex(line, pos + 2);
+					CvtToHex(line, pos + 2, flags & IsEnum ? ',' : ';');
 				}
 			}
 		}
@@ -247,7 +263,7 @@ void CvtIdaEnum(std::ifstream& file, std::string& line, size_t start, int flags)
 		}
 		else if (flags & DecToHex)
 		{
-			CvtToHex(line, NumStart);
+			CvtToHex(line, NumStart, ',');
 		}
 
 		line.erase(NumStart - 3, 1); // Removing the extra space IDA adds between var name and equal sign
