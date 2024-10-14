@@ -67,15 +67,50 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
 	std::vector<std::string> lines;
 	size_t LongestName = 0;
+
+	bool multiline = false; /* Multiline Comments */
 	
 	while (std::getline(file, line) && line.find('}') == npos)
 	{
-		if (flags & RemoveWhitespace && line.find('/') == npos && line.find(';') == npos && line.find('=') == npos)
+		size_t pos = line.find_first_of('/');
+
+		// Handling comments and empty lines
+
+		if (multiline)
+		{
+			while (pos != npos)
+			{
+				if (pos != 0 && line[pos - 1] == '*')
+				{
+					multiline = false;
+					break;
+				}
+
+				pos = line.find_first_of('/', pos + 1);
+			}
+		}
+		else if (pos != npos && line[pos + 1] == '*')
+		{
+			do
+			{
+				pos = line.find_first_of('*', pos + 2);
+
+				if (pos == npos)
+				{
+					multiline = true;
+					break;
+				}
+			}
+			while (strcmp(line.substr(pos).c_str(), "*/"));
+		}
+		else if (flags & RemoveWhitespace && line.find('/') == npos && line.find(';') == npos && line.find('=') == npos)
 		{
 			continue;
 		}
 
-		size_t pos = 0;
+		// Removing/adding extra whitespace at the start of the line for alignment
+		
+		pos = 0;
 		while (line[pos] == ' ' || line[pos] == '\t') 
 		{ 
 			++pos; 
@@ -83,6 +118,8 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 
 		if (pos) line.erase(0, pos);
 		line.insert(0, 4, ' '); 
+
+		// Aligning members and converting decimal values to hex if requested
 
 		pos = line.find_first_of('=');
 		if (pos != npos)
