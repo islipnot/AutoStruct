@@ -4,10 +4,10 @@
 
 enum PROCESSING_FLAGS
 {
-	DecToHex         = 1,
-	RemoveWhitespace = 2,
-	ConvertTypedef   = 4,
-	HasTypedef       = 8
+	DecToHex   = 1,
+	RemoveWs   = 2,
+	CppConversion     = 4,
+	HasTypedef = 8
 };
 
 struct LineData
@@ -21,18 +21,21 @@ void PrintCppData(std::vector<LineData>& lines, std::vector<size_t>& AlignmentVa
 	for (LineData& data : lines)
 	{
 		std::string& line = data.line;
-		const size_t EqualPos = line.find_first_of('=');
-		const size_t FurthestEqual = AlignmentValues[data.AlignmentIndex];
+		size_t EqualPos = line.find_first_of('=');
 
-		if (EqualPos != npos && EqualPos - 1 < FurthestEqual)
+		if (EqualPos != npos)
 		{
-			line.insert(EqualPos, FurthestEqual - EqualPos, ' ');
+			const size_t FurthestEqual = AlignmentValues[data.AlignmentIndex];
+			if (EqualPos - 1 < FurthestEqual)
+			{
+				line.insert(EqualPos, FurthestEqual - EqualPos, ' ');
+			}
 		}
-
+		
 		std::cout << line << '\n';
 	}
 
-	if (!(flags & HasTypedef) || flags & ConvertTypedef)
+	if (!(flags & HasTypedef) || flags & CppConversion)
 	{
 		std::cout << "};\n";
 	}
@@ -123,7 +126,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			}
 			while (strcmp(line.substr(pos).c_str(), "*/"));
 		}
-		else if (flags & RemoveWhitespace && pos == npos && line.find(';') == npos && line.find('=') == npos && line.find('u') == npos && line.find('s') == npos && line.find('{') == npos)
+		else if (flags & RemoveWs && pos == npos && line.find(';') == npos && line.find('=') == npos && line.find('u') == npos && line.find('s') == npos && line.find('{') == npos)
 		{
 			continue;
 		}
@@ -153,16 +156,25 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		// Aligning members and converting decimal values to hex if requested
 
 		pos = line.find_first_of('=');
+
 		if (pos != npos)
 		{
-			if (pos > AlignmentValues.back())
+			if (flags & CppConversion)
 			{
-				AlignmentValues.back() = pos;
+				--pos;
+				line.erase(pos, line.find_first_of(';') - pos);
 			}
-
-			if (flags & DecToHex)
+			else
 			{
-				CvtToHex(line, pos + 2);
+				if (pos > AlignmentValues.back())
+				{
+					AlignmentValues.back() = pos;
+				}
+
+				if (flags & DecToHex)
+				{
+					CvtToHex(line, pos + 2);
+				}
 			}
 		}
 
@@ -175,7 +187,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		lines.emplace_back(LineData{ line, AlignmentValues.size() - 1 });
 	}
 
-	if (flags & HasTypedef && !(flags & ConvertTypedef))
+	if (flags & HasTypedef && !(flags & CppConversion))
 	{
 		std::getline(file, line);
 		lines.emplace_back(line);
@@ -281,10 +293,10 @@ int wmain(int argc, wchar_t* argv[])
 	for (int i = 2; i < argc; ++i)
 	{
 		if (_wcsicmp(argv[i], L"convert") == 0)
-			flags |= ConvertTypedef;
+			flags |= CppConversion;
 
 		else if (_wcsicmp(argv[i], L"rws") == 0)
-			flags |= RemoveWhitespace;
+			flags |= RemoveWs;
 
 		else if (_wcsicmp(argv[i], L"hex") == 0)
 			flags |= DecToHex;
@@ -311,7 +323,7 @@ int wmain(int argc, wchar_t* argv[])
 		{
 			flags |= HasTypedef;
 
-			if (flags & ConvertTypedef)
+			if (flags & CppConversion)
 			{
 				line.erase(0, 8);
 
@@ -343,7 +355,7 @@ int wmain(int argc, wchar_t* argv[])
 
 	// Formating typedefs to IDA local type insertion syntax
 
-	if (flags & ConvertTypedef)
+	if (flags & CppConversion)
 	{
 		size_t pos = line.find_first_not_of(' ', 1);
 
