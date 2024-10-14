@@ -357,6 +357,8 @@ int wmain(int argc, wchar_t* argv[])
 
 		// C++ struct/enum
 
+		if (line[0] == 'e') flags |= IsEnum;
+
 		std::cout << line;
 
 		if (line.find('{') == npos)
