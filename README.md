@@ -9,7 +9,7 @@ Automatic alignment and syntax conversion of IDA/C++ enums and structs.
 - The type of structure will automatically be detected, and alignment/conversion will be applied.
 - If you do something especially weird like put a multiline comment before a member on the same line, it will probably break.
 
-### Arguments (Case-Insensitive)
+### Flags (Case-Insensitive)
 
 - "Convert": Formats struct/enum typedefs for IDA, so that they can be inserted into IDA local types all at once.
 - "Rws": Removes empty lines (rws = remove whitespace).
