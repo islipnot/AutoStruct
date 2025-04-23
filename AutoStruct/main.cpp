@@ -4,46 +4,20 @@
 
 enum PROCESSING_FLAGS
 {
-	DecToHex      = 1,
-	RemoveWs      = 2,
-	CppConversion = 4,
-	HasTypedef    = 8,
-	IsEnum        = 16
+	HexCvt     = 1,
+	EraseWs    = 2,
+	CppCvt     = 4,
+	HasTypedef = 8,
+	IsEnum     = 16
 };
 
 struct LineData
 {
 	std::string line;
-	size_t AlignmentIndex;
+	int AlignmentIndex;
 };
 
-void PrintCppData(std::vector<LineData>& lines, std::vector<size_t>& AlignmentValues, int flags)
-{
-	for (LineData& data : lines)
-	{
-		std::string& line = data.line;
-		size_t EqualPos = line.find_first_of('=');
-
-		if (EqualPos != npos)
-		{
-			const size_t FurthestEqual = AlignmentValues[data.AlignmentIndex];
-			if (EqualPos - 1 < FurthestEqual)
-			{
-				line.insert(EqualPos, FurthestEqual - EqualPos, ' ');
-			}
-		}
-		
-		std::cout << line << '\n';
-	}
-
-	if (!(flags & HasTypedef) || flags & CppConversion)
-	{
-		std::cout << "};\n";
-	}
-	else std::cout << '\n';
-}
-
-void CvtToHex(std::string& line, size_t NumPos, char EndSignifier)
+void DecToHex(std::string& line, size_t NumPos, char EndSignifier)
 {
 	bool IgnoreSignifier = false;
 
@@ -90,10 +64,61 @@ void CvtToHex(std::string& line, size_t NumPos, char EndSignifier)
 	}
 }
 
+void PrintCppData(std::vector<LineData>& lines, std::vector<int>& comments, std::vector<size_t>& AlignmentValues, int flags)
+{
+	for (int i = 0, sz = static_cast<int>(lines.size()); i < sz; ++i)
+	{
+		LineData& data = lines[i];
+
+		std::string& line = data.line;
+		size_t EqualPos = line.find_first_of('=');
+
+		if (EqualPos != npos)
+		{
+			const size_t FurthestEqual = AlignmentValues[data.AlignmentIndex];
+			if (EqualPos - 1 < FurthestEqual)
+			{
+				line.insert(EqualPos, FurthestEqual - EqualPos, ' ');
+			}
+		}
+
+		// Putting newlines before/after inline structs/unions, giving the same appearance as the following if statement
+
+		if (i != sz - 1 && comments[i] != -1)
+		{
+			// Creating a copy of the indexed line and erasing indentation and comments
+
+			std::string cpy = line.substr(line.find_first_not_of(' '));
+			if (comments[i]) cpy.erase(comments[i] + (line.size() - cpy.size()));
+
+			// Checking
+
+			if (!strncmp(cpy.c_str(), "struct", 6) || !strncmp(cpy.c_str(), "union", 5))
+			{
+				std::cout << '\n';
+			}
+			else if (std::count(cpy.begin(), cpy.end(), '{') - std::count(cpy.begin(), cpy.end(), '}') < 0)
+			{
+				line.push_back('\n');
+			}
+
+		}
+
+		std::cout << line << '\n';
+	}
+
+	if (!(flags & HasTypedef) || flags & CppCvt)
+	{
+		std::cout << "};\n";
+	}
+	else std::cout << '\n';
+}
+
 void HandleCppData(std::ifstream& file, std::string& line, int flags)
 {
 	std::vector<LineData> lines;
 	std::vector<size_t> AlignmentValues = { 0 };
+	std::vector<int> CommentData;
 
 	int SpaceCount = 4; // Number of spaces at the start of a line
 	bool multiline = false; // Multiline comments
@@ -106,7 +131,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			if (SpaceCount > 4)
 			{
 				SpaceCount -= 4;
-				AlignmentValues.emplace_back(0);
+				AlignmentValues.push_back(0);
 			}
 			else break;
 		}
@@ -114,6 +139,9 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 		// Handling comments and empty lines
 
 		size_t pos = line.find_first_of('/');
+
+		int CommentPos = static_cast<int>(pos);
+		if (pos != npos && CommentPos && line[CommentPos - 1] == '*') --CommentPos;
 
 		if (multiline)
 		{
@@ -142,7 +170,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			}
 			while (strcmp(line.substr(pos).c_str(), "*/"));
 		}
-		else if (flags & RemoveWs && pos == npos && line.find(';') == npos && line.find('=') == npos && line.find('u') == npos && line.find('s') == npos && line.find('{') == npos)
+		else if (flags & EraseWs && pos == npos && line.find(';') == npos && line.find('=') == npos && line.find('u') == npos && line.find('s') == npos && line.find('{') == npos)
 		{
 			continue;
 		}
@@ -154,7 +182,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 
 		if (line.substr(0, pos).find('{') != npos)
 		{
-			AlignmentValues.emplace_back(0);
+			AlignmentValues.push_back(0);
 			HasOpenBracket = true;
 		}
 
@@ -175,7 +203,7 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 
 		if (pos != npos)
 		{
-			if (flags & CppConversion)
+			if (flags & CppCvt)
 			{
 				--pos;
 				line.erase(pos, line.find_first_of(';') - pos);
@@ -187,9 +215,9 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 					AlignmentValues.back() = pos;
 				}
 
-				if (flags & DecToHex)
+				if (flags & HexCvt)
 				{
-					CvtToHex(line, pos + 2, flags & IsEnum ? ',' : ';');
+					DecToHex(line, pos + 2, flags & IsEnum ? ',' : ';');
 				}
 			}
 		}
@@ -200,16 +228,18 @@ void HandleCppData(std::ifstream& file, std::string& line, int flags)
 			HasOpenBracket = false;
 		}
 
-		lines.emplace_back(LineData{ line, AlignmentValues.size() - 1 });
+		lines.emplace_back(LineData{ line, static_cast<int>(AlignmentValues.size() - 1) });
+		CommentData.push_back(CommentPos != npos ? CommentPos : 0);
 	}
 
-	if (flags & HasTypedef && !(flags & CppConversion))
+	if (flags & HasTypedef && !(flags & CppCvt))
 	{
 		std::getline(file, line);
 		lines.emplace_back(line);
+		CommentData.push_back(0);
 	}
 	
-	PrintCppData(lines, AlignmentValues, flags);
+	PrintCppData(lines, CommentData, AlignmentValues, flags);
 }
 
 void PrintIdaEnum(std::vector<std::string>& lines, size_t LongestName, int flags)
@@ -261,9 +291,9 @@ void CvtIdaEnum(std::ifstream& file, std::string& line, size_t start, int flags)
 			line.pop_back();
 			line.insert(NumStart, "0x");
 		}
-		else if (flags & DecToHex)
+		else if (flags & HexCvt)
 		{
-			CvtToHex(line, NumStart, ',');
+			DecToHex(line, NumStart, ',');
 		}
 
 		line.erase(NumStart - 3, 1); // Removing the extra space IDA adds between var name and equal sign
@@ -309,13 +339,13 @@ int wmain(int argc, wchar_t* argv[])
 	for (int i = 2; i < argc; ++i)
 	{
 		if (_wcsicmp(argv[i], L"convert") == 0)
-			flags |= CppConversion;
+			flags |= CppCvt;
 
 		else if (_wcsicmp(argv[i], L"rws") == 0)
-			flags |= RemoveWs;
+			flags |= EraseWs;
 
 		else if (_wcsicmp(argv[i], L"hex") == 0)
-			flags |= DecToHex;
+			flags |= HexCvt;
 	}
 
 	// Handling the provided data accordingly
@@ -339,7 +369,7 @@ int wmain(int argc, wchar_t* argv[])
 		{
 			flags |= HasTypedef;
 
-			if (flags & CppConversion)
+			if (flags & CppCvt)
 			{
 				line.erase(0, 8);
 
@@ -373,7 +403,7 @@ int wmain(int argc, wchar_t* argv[])
 
 	// Formating typedefs to IDA local type insertion syntax
 
-	if (flags & CppConversion)
+	if (flags & CppCvt)
 	{
 		size_t pos = line.find_first_not_of(' ', 1);
 
@@ -384,6 +414,7 @@ int wmain(int argc, wchar_t* argv[])
 		else line.erase(0, line.find_first_not_of(' ', 1) - 1);
 
 		bool ShouldBreak = false;
+
 		while (true)
 		{
 			pos = line.find_first_of(',');
