@@ -1,26 +1,27 @@
 # AutoStruct
-
-Automatic alignment and syntax conversion of IDA/C++ enums and structs.
+Automatic alignment and syntax conversion of IDA/C++ enums and structs. This is particularly useful when you're reversing undocumented structs/enums and need to integrate them into your code.
 
 # Usage
 
-- Argument format: &lt;FilePath&gt; &lt;Flags&gt;
-- FilePath must be the path of a file containing the struct/enum that you want to make changes to, with nothing else in the file. This may change in the future to allow the search of a file for an enum/struct.
-- The type of structure will automatically be detected, and alignment/conversion will be applied.
-- If you do something especially weird like put a multiline comment before a member on the same line, it will probably break.
+### Arguments (case-insensitive)
+- ```convert``` - formats struct/enum typedefs for IDA, so that they can be inserted into IDA local types all at once
+- ```rws``` - stands for remove whitespace, it removes blank lines
+- ```hex``` - converts all decimal numbers to hexidecimal
 
-### Flags (Case-Insensitive)
+### Notes
+- You must put the data you want parsed into a file and provide it's path as the first argument
+- The type of structure will automatically be detected, and alignment/conversion will be applied
+- Some uniquely weird cases may not be accounted for, though that is unlikely to ever matter unless you're trying to break the logic
 
-- "Convert": Formats struct/enum typedefs for IDA, so that they can be inserted into IDA local types all at once.
-- "Rws": Removes empty lines (rws = remove whitespace).
-- "Hex": Converts all decimal to hexidecimal.
-
-## Screenshots
-
+# Screenshots
+### Aligning and formatting a C++ struct to be imported to IDA Pro
 ![Struct Conversion](.github/StructConversion.png)
 
+### Aligning and formatting a C++ struct
 ![Struct Alignment](.github/StructAlignment.png)
 
+### Converting an IDA Pro enum to a C++ enum
 ![Enum Conversion](.github/EnumConversion.png)
 
+### Aligning and formatting a C++ enum
 ![Enum Alignment](.github/EnumAlignment.png)
